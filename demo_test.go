@@ -6,16 +6,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dimovnike/forwardauth"
+	plugindemo "github.com/dimovnike/forwardauth"
 )
 
 func TestDemo(t *testing.T) {
 	cfg := plugindemo.CreateConfig()
-	cfg.Headers["X-Host"] = "[[.Host]]"
-	cfg.Headers["X-Method"] = "[[.Method]]"
-	cfg.Headers["X-URL"] = "[[.URL]]"
-	cfg.Headers["X-URL"] = "[[.URL]]"
-	cfg.Headers["X-Demo"] = "test"
+	cfg.Address = "localhost"
+	// cfg.Headers["X-Host"] = "[[.Host]]"
+	// cfg.Headers["X-Method"] = "[[.Method]]"
+	// cfg.Headers["X-URL"] = "[[.URL]]"
+	// cfg.Headers["X-URL"] = "[[.URL]]"
+	// cfg.Headers["X-Demo"] = "test"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
@@ -34,10 +35,10 @@ func TestDemo(t *testing.T) {
 
 	handler.ServeHTTP(recorder, req)
 
-	assertHeader(t, req, "X-Host", "localhost")
-	assertHeader(t, req, "X-URL", "http://localhost")
-	assertHeader(t, req, "X-Method", "GET")
-	assertHeader(t, req, "X-Demo", "test")
+	// assertHeader(t, req, "X-Host", "localhost")
+	// assertHeader(t, req, "X-URL", "http://localhost")
+	// assertHeader(t, req, "X-Method", "GET")
+	// assertHeader(t, req, "X-Demo", "test")
 }
 
 func assertHeader(t *testing.T, req *http.Request, key, expected string) {
