@@ -35,7 +35,7 @@ pilot:
 experimental:
   plugins:
     example:
-      moduleName: github.com/traefik/plugindemo
+      moduleName: github.com/dimovnike/forwardauth
       version: v0.2.1
 ```
 
@@ -99,10 +99,10 @@ pilot:
 experimental:
   localPlugins:
     example:
-      moduleName: github.com/traefik/plugindemo
+      moduleName: github.com/dimovnike/forwardauth
 ```
 
-(In the above example, the `plugindemo` plugin will be loaded from the path `./plugins-local/src/github.com/traefik/plugindemo`.)
+(In the above example, the `plugindemo` plugin will be loaded from the path `./plugins-local/src/github.com/dimovnike/forwardauth`.)
 
 ```yaml
 # Dynamic configuration
@@ -265,4 +265,4 @@ In order for your plugin to be successfully imported by Traefik Pilot, consult t
 
 This repository includes an example plugin, `demo`, for you to use as a reference for developing your own plugins.
 
-[![Build Status](https://github.com/traefik/plugindemo/workflows/Main/badge.svg?branch=master)](https://github.com/traefik/plugindemo/actions)
+[![Build Status](https://github.com/dimovnike/forwardauth/workflows/Main/badge.svg?branch=master)](https://github.com/traefik/plugindemo/actions)

@@ -1,3 +1,3 @@
-module github.com/traefik/plugindemo
+module github.com/dimovnike/forwardauth
 
 go 1.16

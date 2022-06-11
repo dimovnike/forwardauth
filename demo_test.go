@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/traefik/plugindemo"
+	"github.com/dimovnike/forwardauth"
 )
 
 func TestDemo(t *testing.T) {
