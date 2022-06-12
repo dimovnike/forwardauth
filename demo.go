@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -16,14 +19,21 @@ import (
 	"github.com/dimovnike/forwardauth/pkg/utils"
 )
 
+var LoggerDEBUG = log.New(ioutil.Discard, "DEBUG: forwardauth: ", log.Ldate|log.Ltime|log.Lshortfile)
+
+func init() {
+	LoggerDEBUG.SetOutput(os.Stdout)
+}
+
 // Config holds the http forward authentication configuration.
 type Config struct {
 	Address string `json:"address,omitempty" toml:"address,omitempty" yaml:"address,omitempty"`
 	// TLS                      *types.ClientTLS `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty" export:"true"`
-	TrustForwardHeader       bool     `json:"trustForwardHeader,omitempty" toml:"trustForwardHeader,omitempty" yaml:"trustForwardHeader,omitempty" export:"true"`
-	AuthResponseHeaders      []string `json:"authResponseHeaders,omitempty" toml:"authResponseHeaders,omitempty" yaml:"authResponseHeaders,omitempty" export:"true"`
-	AuthResponseHeadersRegex string   `json:"authResponseHeadersRegex,omitempty" toml:"authResponseHeadersRegex,omitempty" yaml:"authResponseHeadersRegex,omitempty" export:"true"`
-	AuthRequestHeaders       []string `json:"authRequestHeaders,omitempty" toml:"authRequestHeaders,omitempty" yaml:"authRequestHeaders,omitempty" export:"true"`
+	TrustForwardHeader       bool              `json:"trustForwardHeader,omitempty" toml:"trustForwardHeader,omitempty" yaml:"trustForwardHeader,omitempty" export:"true"`
+	AuthResponseHeaders      []string          `json:"authResponseHeaders,omitempty" toml:"authResponseHeaders,omitempty" yaml:"authResponseHeaders,omitempty" export:"true"`
+	AuthResponseHeadersRegex string            `json:"authResponseHeadersRegex,omitempty" toml:"authResponseHeadersRegex,omitempty" yaml:"authResponseHeadersRegex,omitempty" export:"true"`
+	AuthRequestHeaders       []string          `json:"authRequestHeaders,omitempty" toml:"authRequestHeaders,omitempty" yaml:"authRequestHeaders,omitempty" export:"true"`
+	RunIfHeadersRegex        map[string]string `json:"runIfHeadersRegex,omitempty" toml:"runIfHeadersRegex,omitempty" yaml:"runIfHeadersRegex,omitempty" export:"true"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -58,6 +68,7 @@ type ForwardAuth struct {
 	client                   http.Client
 	trustForwardHeader       bool
 	authRequestHeaders       []string
+	runIfHeadersRegex        map[string]*regexp.Regexp
 }
 
 // New creates a forward auth middleware.
@@ -100,11 +111,30 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		fa.authResponseHeadersRegex = re
 	}
 
+	if len(config.RunIfHeadersRegex) > 0 {
+		fa.runIfHeadersRegex = map[string]*regexp.Regexp{}
+
+		for k, v := range config.RunIfHeadersRegex {
+			re, err := regexp.Compile(v)
+			if err != nil {
+				return nil, fmt.Errorf("error compiling regular expression %s: %w", v, err)
+			}
+
+			fa.runIfHeadersRegex[k] = re
+		}
+	}
+
+	LoggerDEBUG.Println("config", config.RunIfHeadersRegex)
+
 	return connectionheader.Remover(fa), nil
 }
 
 func (fa *ForwardAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// logger := log.FromContext(middlewares.GetLoggerCtx(req.Context(), fa.name, forwardedTypeName))
+	if !runHeadersRegex(req.Header, fa.runIfHeadersRegex) {
+		fa.next.ServeHTTP(rw, req)
+		return
+	}
 
 	forwardReq, err := http.NewRequest(http.MethodGet, fa.address, nil)
 	// tracing.LogRequest(tracing.GetSpan(req), forwardReq)
@@ -285,4 +315,25 @@ func filterForwardRequestHeaders(forwardRequestHeaders http.Header, allowedHeade
 	}
 
 	return filteredHeaders
+}
+
+func runHeadersRegex(headers http.Header, headersRegex map[string]*regexp.Regexp) bool {
+	LoggerDEBUG.Println("XDEBUG", "got regex:", len(headersRegex))
+
+	if len(headersRegex) == 0 {
+		return true
+	}
+
+	for hKey, regex := range headersRegex {
+		hv := headers.Get(hKey)
+
+		LoggerDEBUG.Println("XDEBUG", "checking header:", hv, hKey, regex.String())
+
+		if hv == "" || !regex.MatchString(hv) {
+			LoggerDEBUG.Println("XDEBUG", "nomatch")
+			return false
+		}
+	}
+
+	return true
 }
