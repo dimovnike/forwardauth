@@ -1,9 +1,0 @@
-# golang.org/x/net v0.0.0-20220607020251-c690dde0001d
-## explicit
-golang.org/x/net/http/httpguts
-golang.org/x/net/idna
-# golang.org/x/text v0.3.7
-golang.org/x/text/secure/bidirule
-golang.org/x/text/transform
-golang.org/x/text/unicode/bidi
-golang.org/x/text/unicode/norm

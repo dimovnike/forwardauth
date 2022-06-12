@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"net/textproto"
 	"strings"
-
-	"golang.org/x/net/http/httpguts"
 )
 
 const (
@@ -18,9 +16,10 @@ const (
 func Remover(next http.Handler) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		var reqUpType string
-		if httpguts.HeaderValuesContainsToken(req.Header[connectionHeader], upgradeHeader) {
-			reqUpType = req.Header.Get(upgradeHeader)
-		}
+		// this breaks traefik
+		// if httpguts.HeaderValuesContainsToken(req.Header[connectionHeader], upgradeHeader) {
+		// 	reqUpType = req.Header.Get(upgradeHeader)
+		// }
 
 		removeConnectionHeaders(req.Header)
 

@@ -2,7 +2,18 @@ package forwardauth
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/dimovnike/forwardauth/pkg/forward"
+	"github.com/dimovnike/forwardauth/pkg/middlewares/connectionheader"
+	"github.com/dimovnike/forwardauth/pkg/utils"
 )
 
 // Config holds the http forward authentication configuration.
@@ -20,41 +31,35 @@ func CreateConfig() *Config {
 	return &Config{}
 }
 
-// const (
-// 	xForwardedURI     = "X-Forwarded-Uri"
-// 	xForwardedMethod  = "X-Forwarded-Method"
-// 	forwardedTypeName = "ForwardedAuthType"
-// )
+const (
+	xForwardedURI     = "X-Forwarded-Uri"
+	xForwardedMethod  = "X-Forwarded-Method"
+	forwardedTypeName = "ForwardedAuthType"
+)
 
 // hopHeaders Hop-by-hop headers to be removed in the authentication request.
 // http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
 // Proxy-Authorization header is forwarded to the authentication server (see https://tools.ietf.org/html/rfc7235#section-4.4).
-// var hopHeaders = []string{
-// 	forward.Connection,
-// 	forward.KeepAlive,
-// 	forward.Te, // canonicalized version of "TE"
-// 	forward.Trailers,
-// 	forward.TransferEncoding,
-// 	forward.Upgrade,
-// }
+var hopHeaders = []string{
+	forward.Connection,
+	forward.KeepAlive,
+	forward.Te, // canonicalized version of "TE"
+	forward.Trailers,
+	forward.TransferEncoding,
+	forward.Upgrade,
+}
 
 type ForwardAuth struct {
-	// address                  string
-	// authResponseHeaders      []string
-	// authResponseHeadersRegex *regexp.Regexp
-	next http.Handler
-	// name                     string
-	// client                   http.Client
-	// trustForwardHeader       bool
-	// authRequestHeaders       []string
+	address                  string
+	authResponseHeaders      []string
+	authResponseHeadersRegex *regexp.Regexp
+	next                     http.Handler
+	name                     string
+	client                   http.Client
+	trustForwardHeader       bool
+	authRequestHeaders       []string
 }
 
-// New creates a forward auth middleware.
-func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	return &ForwardAuth{next: next}, nil
-}
-
-/*
 // New creates a forward auth middleware.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	// log.FromContext(middlewares.GetLoggerCtx(ctx, name, forwardedTypeName)).Debug("Creating middleware")
@@ -97,14 +102,8 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 
 	return connectionheader.Remover(fa), nil
 }
-*/
 
 func (fa *ForwardAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	fa.next.ServeHTTP(rw, req)
-}
-
-/*
-func (fa *ForwardAuth) xServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// logger := log.FromContext(middlewares.GetLoggerCtx(req.Context(), fa.name, forwardedTypeName))
 
 	forwardReq, err := http.NewRequest(http.MethodGet, fa.address, nil)
@@ -155,8 +154,8 @@ func (fa *ForwardAuth) xServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		fmt.Printf("Remote error %s. StatusCode: %d", fa.address, forwardResponse.StatusCode)
 		fmt.Println()
 
-		// utils.CopyHeaders(rw.Header(), forwardResponse.Header)
-		// utils.RemoveHeaders(rw.Header(), hopHeaders...)
+		utils.CopyHeaders(rw.Header(), forwardResponse.Header)
+		utils.RemoveHeaders(rw.Header(), hopHeaders...)
 
 		// Grab the location header, if any.
 		redirectURL, err := forwardResponse.Location()
@@ -213,19 +212,19 @@ func (fa *ForwardAuth) xServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func writeHeader(req, forwardReq *http.Request, trustForwardHeader bool, allowedHeaders []string) {
-	// utils.CopyHeaders(forwardReq.Header, req.Header)
-	// utils.RemoveHeaders(forwardReq.Header, hopHeaders...)
+	utils.CopyHeaders(forwardReq.Header, req.Header)
+	utils.RemoveHeaders(forwardReq.Header, hopHeaders...)
 
 	forwardReq.Header = filterForwardRequestHeaders(forwardReq.Header, allowedHeaders)
 
-	// if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-	// 	if trustForwardHeader {
-	// 		if prior, ok := req.Header[forward.XForwardedFor]; ok {
-	// 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
-	// 		}
-	// 	}
-	// 	forwardReq.Header.Set(forward.XForwardedFor, clientIP)
-	// }
+	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+		if trustForwardHeader {
+			if prior, ok := req.Header[forward.XForwardedFor]; ok {
+				clientIP = strings.Join(prior, ", ") + ", " + clientIP
+			}
+		}
+		forwardReq.Header.Set(forward.XForwardedFor, clientIP)
+	}
 
 	xMethod := req.Header.Get(xForwardedMethod)
 	switch {
@@ -237,29 +236,29 @@ func writeHeader(req, forwardReq *http.Request, trustForwardHeader bool, allowed
 		forwardReq.Header.Del(xForwardedMethod)
 	}
 
-	// xfp := req.Header.Get(forward.XForwardedProto)
-	// switch {
-	// case xfp != "" && trustForwardHeader:
-	// 	forwardReq.Header.Set(forward.XForwardedProto, xfp)
-	// case req.TLS != nil:
-	// 	forwardReq.Header.Set(forward.XForwardedProto, "https")
-	// default:
-	// 	forwardReq.Header.Set(forward.XForwardedProto, "http")
-	// }
+	xfp := req.Header.Get(forward.XForwardedProto)
+	switch {
+	case xfp != "" && trustForwardHeader:
+		forwardReq.Header.Set(forward.XForwardedProto, xfp)
+	case req.TLS != nil:
+		forwardReq.Header.Set(forward.XForwardedProto, "https")
+	default:
+		forwardReq.Header.Set(forward.XForwardedProto, "http")
+	}
 
-	// if xfp := req.Header.Get(forward.XForwardedPort); xfp != "" && trustForwardHeader {
-	// 	forwardReq.Header.Set(forward.XForwardedPort, xfp)
-	// }
+	if xfp := req.Header.Get(forward.XForwardedPort); xfp != "" && trustForwardHeader {
+		forwardReq.Header.Set(forward.XForwardedPort, xfp)
+	}
 
-	// xfh := req.Header.Get(forward.XForwardedHost)
-	// switch {
-	// case xfh != "" && trustForwardHeader:
-	// 	forwardReq.Header.Set(forward.XForwardedHost, xfh)
-	// case req.Host != "":
-	// 	forwardReq.Header.Set(forward.XForwardedHost, req.Host)
-	// default:
-	// 	forwardReq.Header.Del(forward.XForwardedHost)
-	// }
+	xfh := req.Header.Get(forward.XForwardedHost)
+	switch {
+	case xfh != "" && trustForwardHeader:
+		forwardReq.Header.Set(forward.XForwardedHost, xfh)
+	case req.Host != "":
+		forwardReq.Header.Set(forward.XForwardedHost, req.Host)
+	default:
+		forwardReq.Header.Del(forward.XForwardedHost)
+	}
 
 	xfURI := req.Header.Get(xForwardedURI)
 	switch {
@@ -287,4 +286,3 @@ func filterForwardRequestHeaders(forwardRequestHeaders http.Header, allowedHeade
 
 	return filteredHeaders
 }
-*/
