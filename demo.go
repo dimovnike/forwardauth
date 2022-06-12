@@ -6,25 +6,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/dimovnike/forwardauth/pkg/middlewares/connectionheader"
-	"github.com/dimovnike/forwardauth/pkg/types"
-	"github.com/vulcand/oxy/forward"
 )
 
 // Config holds the http forward authentication configuration.
 type Config struct {
-	Address                  string           `json:"address,omitempty" toml:"address,omitempty" yaml:"address,omitempty"`
-	TLS                      *types.ClientTLS `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty" export:"true"`
-	TrustForwardHeader       bool             `json:"trustForwardHeader,omitempty" toml:"trustForwardHeader,omitempty" yaml:"trustForwardHeader,omitempty" export:"true"`
-	AuthResponseHeaders      []string         `json:"authResponseHeaders,omitempty" toml:"authResponseHeaders,omitempty" yaml:"authResponseHeaders,omitempty" export:"true"`
-	AuthResponseHeadersRegex string           `json:"authResponseHeadersRegex,omitempty" toml:"authResponseHeadersRegex,omitempty" yaml:"authResponseHeadersRegex,omitempty" export:"true"`
-	AuthRequestHeaders       []string         `json:"authRequestHeaders,omitempty" toml:"authRequestHeaders,omitempty" yaml:"authRequestHeaders,omitempty" export:"true"`
+	Address string `json:"address,omitempty" toml:"address,omitempty" yaml:"address,omitempty"`
+	// TLS                      *types.ClientTLS `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty" export:"true"`
+	TrustForwardHeader       bool     `json:"trustForwardHeader,omitempty" toml:"trustForwardHeader,omitempty" yaml:"trustForwardHeader,omitempty" export:"true"`
+	AuthResponseHeaders      []string `json:"authResponseHeaders,omitempty" toml:"authResponseHeaders,omitempty" yaml:"authResponseHeaders,omitempty" export:"true"`
+	AuthResponseHeadersRegex string   `json:"authResponseHeadersRegex,omitempty" toml:"authResponseHeadersRegex,omitempty" yaml:"authResponseHeadersRegex,omitempty" export:"true"`
+	AuthRequestHeaders       []string `json:"authRequestHeaders,omitempty" toml:"authRequestHeaders,omitempty" yaml:"authRequestHeaders,omitempty" export:"true"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -41,14 +37,14 @@ const (
 // hopHeaders Hop-by-hop headers to be removed in the authentication request.
 // http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
 // Proxy-Authorization header is forwarded to the authentication server (see https://tools.ietf.org/html/rfc7235#section-4.4).
-var hopHeaders = []string{
-	forward.Connection,
-	forward.KeepAlive,
-	forward.Te, // canonicalized version of "TE"
-	forward.Trailers,
-	forward.TransferEncoding,
-	forward.Upgrade,
-}
+// var hopHeaders = []string{
+// 	forward.Connection,
+// 	forward.KeepAlive,
+// 	forward.Te, // canonicalized version of "TE"
+// 	forward.Trailers,
+// 	forward.TransferEncoding,
+// 	forward.Upgrade,
+// }
 
 type ForwardAuth struct {
 	address                  string
@@ -82,16 +78,16 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		Timeout: 30 * time.Second,
 	}
 
-	if config.TLS != nil {
-		tlsConfig, err := config.TLS.CreateTLSConfig(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create client TLS configuration: %w", err)
-		}
+	// if config.TLS != nil {
+	// 	tlsConfig, err := config.TLS.CreateTLSConfig(ctx)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("unable to create client TLS configuration: %w", err)
+	// 	}
 
-		tr := http.DefaultTransport.(*http.Transport).Clone()
-		tr.TLSClientConfig = tlsConfig
-		fa.client.Transport = tr
-	}
+	// 	tr := http.DefaultTransport.(*http.Transport).Clone()
+	// 	tr.TLSClientConfig = tlsConfig
+	// 	fa.client.Transport = tr
+	// }
 
 	if config.AuthResponseHeadersRegex != "" {
 		re, err := regexp.Compile(config.AuthResponseHeadersRegex)
@@ -218,14 +214,14 @@ func writeHeader(req, forwardReq *http.Request, trustForwardHeader bool, allowed
 
 	forwardReq.Header = filterForwardRequestHeaders(forwardReq.Header, allowedHeaders)
 
-	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-		if trustForwardHeader {
-			if prior, ok := req.Header[forward.XForwardedFor]; ok {
-				clientIP = strings.Join(prior, ", ") + ", " + clientIP
-			}
-		}
-		forwardReq.Header.Set(forward.XForwardedFor, clientIP)
-	}
+	// if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+	// 	if trustForwardHeader {
+	// 		if prior, ok := req.Header[forward.XForwardedFor]; ok {
+	// 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
+	// 		}
+	// 	}
+	// 	forwardReq.Header.Set(forward.XForwardedFor, clientIP)
+	// }
 
 	xMethod := req.Header.Get(xForwardedMethod)
 	switch {
@@ -237,29 +233,29 @@ func writeHeader(req, forwardReq *http.Request, trustForwardHeader bool, allowed
 		forwardReq.Header.Del(xForwardedMethod)
 	}
 
-	xfp := req.Header.Get(forward.XForwardedProto)
-	switch {
-	case xfp != "" && trustForwardHeader:
-		forwardReq.Header.Set(forward.XForwardedProto, xfp)
-	case req.TLS != nil:
-		forwardReq.Header.Set(forward.XForwardedProto, "https")
-	default:
-		forwardReq.Header.Set(forward.XForwardedProto, "http")
-	}
+	// xfp := req.Header.Get(forward.XForwardedProto)
+	// switch {
+	// case xfp != "" && trustForwardHeader:
+	// 	forwardReq.Header.Set(forward.XForwardedProto, xfp)
+	// case req.TLS != nil:
+	// 	forwardReq.Header.Set(forward.XForwardedProto, "https")
+	// default:
+	// 	forwardReq.Header.Set(forward.XForwardedProto, "http")
+	// }
 
-	if xfp := req.Header.Get(forward.XForwardedPort); xfp != "" && trustForwardHeader {
-		forwardReq.Header.Set(forward.XForwardedPort, xfp)
-	}
+	// if xfp := req.Header.Get(forward.XForwardedPort); xfp != "" && trustForwardHeader {
+	// 	forwardReq.Header.Set(forward.XForwardedPort, xfp)
+	// }
 
-	xfh := req.Header.Get(forward.XForwardedHost)
-	switch {
-	case xfh != "" && trustForwardHeader:
-		forwardReq.Header.Set(forward.XForwardedHost, xfh)
-	case req.Host != "":
-		forwardReq.Header.Set(forward.XForwardedHost, req.Host)
-	default:
-		forwardReq.Header.Del(forward.XForwardedHost)
-	}
+	// xfh := req.Header.Get(forward.XForwardedHost)
+	// switch {
+	// case xfh != "" && trustForwardHeader:
+	// 	forwardReq.Header.Set(forward.XForwardedHost, xfh)
+	// case req.Host != "":
+	// 	forwardReq.Header.Set(forward.XForwardedHost, req.Host)
+	// default:
+	// 	forwardReq.Header.Del(forward.XForwardedHost)
+	// }
 
 	xfURI := req.Header.Get(xForwardedURI)
 	switch {
