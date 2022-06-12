@@ -1,4 +1,4 @@
-package plugindemo_test
+package forwardauth_test
 
 import (
 	"context"

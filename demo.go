@@ -1,16 +1,8 @@
-// Package plugindemo a demo plugin.
-package plugindemo
+package forwardauth
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
 	"net/http"
-	"regexp"
-	"time"
-
-	"github.com/dimovnike/forwardauth/pkg/middlewares/connectionheader"
 )
 
 // Config holds the http forward authentication configuration.
@@ -28,11 +20,11 @@ func CreateConfig() *Config {
 	return &Config{}
 }
 
-const (
-	xForwardedURI     = "X-Forwarded-Uri"
-	xForwardedMethod  = "X-Forwarded-Method"
-	forwardedTypeName = "ForwardedAuthType"
-)
+// const (
+// 	xForwardedURI     = "X-Forwarded-Uri"
+// 	xForwardedMethod  = "X-Forwarded-Method"
+// 	forwardedTypeName = "ForwardedAuthType"
+// )
 
 // hopHeaders Hop-by-hop headers to be removed in the authentication request.
 // http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
@@ -47,16 +39,22 @@ const (
 // }
 
 type ForwardAuth struct {
-	address                  string
-	authResponseHeaders      []string
-	authResponseHeadersRegex *regexp.Regexp
-	next                     http.Handler
-	name                     string
-	client                   http.Client
-	trustForwardHeader       bool
-	authRequestHeaders       []string
+	// address                  string
+	// authResponseHeaders      []string
+	// authResponseHeadersRegex *regexp.Regexp
+	next http.Handler
+	// name                     string
+	// client                   http.Client
+	// trustForwardHeader       bool
+	// authRequestHeaders       []string
 }
 
+// New creates a forward auth middleware.
+func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+	return &ForwardAuth{next: next}, nil
+}
+
+/*
 // New creates a forward auth middleware.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	// log.FromContext(middlewares.GetLoggerCtx(ctx, name, forwardedTypeName)).Debug("Creating middleware")
@@ -99,8 +97,14 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 
 	return connectionheader.Remover(fa), nil
 }
+*/
 
 func (fa *ForwardAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	fa.next.ServeHTTP(rw, req)
+}
+
+/*
+func (fa *ForwardAuth) xServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// logger := log.FromContext(middlewares.GetLoggerCtx(req.Context(), fa.name, forwardedTypeName))
 
 	forwardReq, err := http.NewRequest(http.MethodGet, fa.address, nil)
@@ -283,3 +287,4 @@ func filterForwardRequestHeaders(forwardRequestHeaders http.Header, allowedHeade
 
 	return filteredHeaders
 }
+*/
